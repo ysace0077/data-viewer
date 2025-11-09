@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>데이터 뷰어</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+            padding: 10px;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+        .header h1 {
+            font-size: 1.8em;
+            color: #1e293b;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .header p {
+            color: #64748b;
+            font-size: 1em;
+        }
+        .upload-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+        .file-input {
+            margin: 15px 0;
+        }
+        .file-input label {
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .file-input label:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .file-input input {
+            display: none;
+        }
+        .file-info {
+            margin-top: 12px;
+            padding: 10px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            color: #475569;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        .content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .main-panel {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 15px;
+        }
+        .sidebar {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+            height: fit-content;
+        }
+        .sidebar h3 {
+            color: #1e293b;
+            margin-bottom: 12px;
+            font-size: 1.2em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .table-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .table-item {
+            padding: 12px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            color: #475569;
+            font-size: 0.9em;
+        }
+        .table-item:hover {
+            background: #f8fafc;
+            color: #3b82f6;
+        }
+        .table-item.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        .table-item:last-child {
+            border-bottom: none;
+        }
+        .table-stats {
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+            font-size: 0.85em;
+            color: #64748b;
+        }
+        .search-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+        .search-panel h3 {
+            color: #1e293b;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        .search-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            margin-bottom: 6px;
+            font-size: 0.85em;
+            color: #64748b;
+            font-weight: 500;
+        }
+        input, select {
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+            background: white;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            height: fit-content;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+        .btn-secondary {
+            background: #64748b;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #475569;
+        }
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        .btn-warning:hover {
+            background: #d97706;
+        }
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .export-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .export-section h4 {
+            margin-bottom: 12px;
+            color: #374151;
+            font-size: 1em;
+        }
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .export-btn {
+            padding: 10px 16px;
+            font-size: 0.85em;
+            flex: 1;
+            max-width: 120px;
+        }
+        .export-info {
+            font-size: 0.75em;
+            color: #64748b;
+            margin-top: 8px;
+        }
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .quick-actions .btn {
+            font-size: 12px;
+            padding: 8px 10px;
+            justify-content: center;
+        }
+        .multi-search-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .multi-search-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .multi-search-header h4 {
+            color: #374151;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .condition-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .condition-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .logic-operator {
+            grid-column: 1 / -1;
+            margin-top: 5px;
+            padding: 5px 10px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.8em;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .results-panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            grid-column: 1 / -1;
+        }
+        .results-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+        }
+        .results-header h3 {
+            color: #1e293b;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        .results-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-size: 0.85em;
+        }
+        .pagination-btn {
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+        .results-table th {
+            background: #f8fafc;
+            padding: 12px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        .results-table th:hover {
+            background: #f1f5f9;
+        }
+        .results-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .results-table tr:hover {
+            background: #f8fafc;
+        }
+        .results-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .number-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            color: #059669;
+        }
+        .decimal-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            color: #7c3aed;
+        }
+        .date-cell {
+            font-family: 'Courier New', monospace;
+            color: #dc2626;
+        }
+        .percent-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            color: #dc2626;
+            font-weight: 600;
+        }
+        .text-cell {
+            text-align: left;
+            color: #374151;
+        }
+        .money-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            color: #1e40af;
+            font-weight: 500;
+        }
+        .status {
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+        .status.loading {
+            background: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid #f59e0b;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 15px;
+            color: #64748b;
+        }
+        .empty-state .icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+        @media (max-width: 1024px) {
+            .main-panel {
+                grid-template-columns: 1fr;
+            }
+            .condition-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 5px;
+            }
+            .results-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+            .export-buttons {
+                flex-direction: column;
+            }
+            .quick-actions {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            }
+            .condition-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 데이터 뷰어</h1>
+            <p>SQLite 데이터베이스 파일을 열어 데이터를 탐색하세요</p>
+        </div>
+
+        <div class="upload-section">
+            <h3>데이터베이스 파일 선택</h3>
+            <div class="file-input">
+                <label for="db-file">
+                    <span>📁 파일 선택</span>
+                </label>
+                <input type="file" id="db-file" accept=".db,.sqlite,.sqlite3">
+            </div>
+            <div class="file-info" id="file-info">선택된 파일이 없습니다</div>
+        </div>
+
+        <div class="content" style="display: none;" id="content-area">
+            <div class="main-panel">
+                <div class="sidebar">
+                    <h3>🗂️ 테이블 목록</h3>
+                    <div class="table-list" id="table-list">
+                        <div class="empty-state">
+                            <div class="icon">📋</div>
+                            <div>테이블을 불러오는 중...</div>
+                        </div>
+                    </div>
+                    <div class="table-stats" id="table-stats"></div>
+                </div>
+
+                <div class="search-panel">
+                    <h3>🔍 데이터 검색</h3>
+                    <div class="search-form">
+                        <div class="form-group">
+                            <label>검색 컬럼</label>
+                            <select id="search-column">
+                                <option value="">모든 컬럼</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>검색 조건</label>
+                            <select id="search-operator">
+                                <option value="LIKE">포함</option>
+                                <option value="=">일치</option>
+                                <option value="!=">불일치</option>
+                                <option value=">">보다 큼</option>
+                                <option value="<">보다 작음</option>
+                                <option value=">=">이상</option>
+                                <option value="<=">이하</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>검색어</label>
+                            <input type="text" id="search-value" placeholder="검색어 입력" onkeypress="handleKeyPress(event)">
+                        </div>
+                        <div class="form-group">
+                            <label>표시 개수</label>
+                            <select id="result-limit">
+                                <option value="50">50개</option>
+                                <option value="100" selected>100개</option>
+                                <option value="500">500개</option>
+                                <option value="0">전체</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="executeSearch()">검색 실행</button>
+                    </div>
+
+                    <!-- 다조건 검색 섹션 -->
+                    <div class="multi-search-section">
+                        <div class="multi-search-header">
+                            <h4>🔍 다조건 검색</h4>
+                            <button class="btn btn-primary btn-sm" onclick="addCondition()">+ 조건 추가</button>
+                        </div>
+                        <div id="multi-search-conditions">
+                            <!-- 조건들이 여기에 동적으로 추가됩니다 -->
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button class="btn btn-success" onclick="executeMultiSearch()">다조건 검색 실행</button>
+                            <button class="btn btn-secondary" onclick="clearMultiSearch()">모든 조건 초기화</button>
+                        </div>
+                    </div>
+
+                    <!-- 검색 결과 내보내기 섹션 -->
+                    <div class="export-section">
+                        <h4>📊 검색 결과 내보내기</h4>
+                        <div class="export-buttons">
+                            <button class="btn btn-success export-btn" onclick="exportCurrentResultsToExcel()">Excel로 저장</button>
+                            <button class="btn btn-warning export-btn" onclick="exportCurrentResultsToCSV()">CSV로 저장</button>
+                        </div>
+                        <div class="export-info" id="export-info">
+                            현재 검색 결과를 내보냅니다
+                        </div>
+                    </div>
+
+                    <div class="quick-actions">
+                        <button class="btn btn-secondary" onclick="showAllData()">전체 데이터</button>
+                        <button class="btn btn-secondary" onclick="countRows()">행 개수</button>
+                        <button class="btn btn-secondary" onclick="quickSearch('recent')">최근 데이터</button>
+                        <button class="btn btn-secondary" onclick="clearSearch()">초기화</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="status-area"></div>
+
+            <div class="results-panel">
+                <div class="results-header">
+                    <h3>📋 검색 결과 <span id="result-count" style="font-size: 0.75em; color: #64748b;"></span></h3>
+                    <div class="results-controls">
+                        <div class="pagination">
+                            <button class="pagination-btn" onclick="previousPage()" id="prev-btn">◀</button>
+                            <span id="page-info">1 페이지</span>
+                            <button class="pagination-btn" onclick="nextPage()" id="next-btn">▶</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="results-body">
+                    <table class="results-table" id="results-table">
+                        <tbody>
+                            <tr>
+                                <td colspan="100" style="text-align: center; padding: 40px 15px; color: #64748b;">
+                                    <div style="font-size: 2.5em; margin-bottom: 10px; opacity: 0.5;">📊</div>
+                                    <div>데이터를 검색해주세요</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db = null;
+        let currentTable = '';
+        let currentSchema = [];
+        let currentPage = 1;
+        let pageSize = 50;
+        let totalRows = 0;
+        let currentResults = { columns: [], rows: [] };
+        let currentQuery = '';
+        let conditionCounter = 0;
+
+        // SQL.js 초기화
+        initSqlJs({
+            locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        }).then(function(SQL) {
+            window.SQL = SQL;
+            showStatus('데이터베이스 파일을 선택해주세요', 'info');
+            document.getElementById('db-file').addEventListener('change', handleFileSelect);
+        });
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                executeSearch();
+            }
+        }
+
+        // 파일 선택 처리
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('file-info').textContent = `선택된 파일: ${file.name}`;
+            showStatus('데이터베이스 파일을 불러오는 중...', 'loading');
+
+            const reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    const Uints = new Uint8Array(reader.result);
+                    db = new SQL.Database(Uints);
+                    showStatus('데이터베이스가 성공적으로 로드되었습니다', 'success');
+                    loadTables();
+                    document.getElementById('content-area').style.display = 'grid';
+                } catch (error) {
+                    showStatus('파일 로드 실패: ' + error.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 테이블 목록 로드
+        function loadTables() {
+            if (!db) return;
+
+            try {
+                const result = db.exec(`
+                    SELECT name FROM sqlite_master 
+                    WHERE type='table' 
+                    AND name NOT LIKE 'sqlite_%'
+                    ORDER BY name
+                `);
+                
+                const tableList = document.getElementById('table-list');
+                tableList.innerHTML = '';
+
+                if (result.length > 0) {
+                    const tables = result[0].values.map(row => row[0]);
+                    tables.forEach(tableName => {
+                        const tableItem = document.createElement('div');
+                        tableItem.className = 'table-item';
+                        tableItem.textContent = tableName;
+                        tableItem.onclick = () => selectTable(tableName);
+                        tableList.appendChild(tableItem);
+                    });
+                    
+                    // 첫 번째 테이블 자동 선택
+                    if (tables.length > 0) {
+                        selectTable(tables[0]);
+                    }
+                } else {
+                    tableList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">❌</div>
+                            <div>테이블을 찾을 수 없습니다</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                showStatus('테이블 목록 조회 실패', 'error');
+            }
+        }
+
+        // 테이블 선택
+        function selectTable(tableName) {
+            currentTable = tableName;
+            currentPage = 1;
+            
+            // 활성 테이블 표시
+            document.querySelectorAll('.table-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.textContent === tableName) {
+                    item.classList.add('active');
+                }
+            });
+
+            loadTableSchema(tableName);
+            showAllData();
+            updateTableStats(tableName);
+            
+            // 다조건 검색 초기화
+            clearMultiSearch();
+        }
+
+        // 테이블 통계 업데이트
+        function updateTableStats(tableName) {
+            if (!db) return;
+
+            try {
+                const countResult = db.exec(`SELECT COUNT(*) as count FROM "${tableName}"`);
+                const count = countResult[0].values[0][0];
+                
+                const statsElement = document.getElementById('table-stats');
+                statsElement.innerHTML = `
+                    <div><strong>${tableName}</strong> 테이블</div>
+                    <div>총 ${count.toLocaleString()}개 행</div>
+                    <div>${currentSchema.length}개 컬럼</div>
+                `;
+            } catch (error) {
+                console.error('통계 조회 실패:', error);
+            }
+        }
+
+        // 테이블 스키마 로드
+        function loadTableSchema(tableName) {
+            if (!db) return;
+
+            try {
+                const result = db.exec(`PRAGMA table_info("${tableName}")`);
+                currentSchema = [];
+                
+                if (result.length > 0) {
+                    currentSchema = result[0].values.map(row => ({
+                        name: row[1],
+                        type: row[2]
+                    }));
+                }
+
+                updateColumnSelects();
+            } catch (error) {
+                showStatus('스키마 로드 실패', 'error');
+            }
+        }
+
+        // 컬럼 선택 옵션 업데이트
+        function updateColumnSelects() {
+            const searchColumn = document.getElementById('search-column');
+            searchColumn.innerHTML = '<option value="">모든 컬럼</option>';
+            
+            currentSchema.forEach(column => {
+                const option = document.createElement('option');
+                option.value = column.name;
+                option.textContent = `${column.name} (${column.type})`;
+                searchColumn.appendChild(option);
+            });
+            
+            // 다조건 검색의 컬럼 선택도 업데이트
+            updateMultiSearchColumns();
+        }
+
+        // 다조건 검색 컬럼 업데이트
+        function updateMultiSearchColumns() {
+            const conditionRows = document.querySelectorAll('.condition-column');
+            conditionRows.forEach(select => {
+                const currentValue = select.value;
+                select.innerHTML = '';
+                
+                currentSchema.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column.name;
+                    option.textContent = `${column.name} (${column.type})`;
+                    select.appendChild(option);
+                });
+                
+                // 이전 값으로 복원
+                if (currentValue) {
+                    select.value = currentValue;
+                }
+            });
+        }
+
+        // 조건 추가
+        function addCondition() {
+            conditionCounter++;
+            const conditionsContainer = document.getElementById('multi-search-conditions');
+            
+            const conditionRow = document.createElement('div');
+            conditionRow.className = 'condition-row';
+            conditionRow.id = `condition-${conditionCounter}`;
+            
+            conditionRow.innerHTML = `
+                <div class="form-group">
+                    <label>컬럼</label>
+                    <select class="condition-column" id="condition-column-${conditionCounter}">
+                        ${currentSchema.map(col => 
+                            `<option value="${col.name}">${col.name} (${col.type})</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>조건</label>
+                    <select class="condition-operator" id="condition-operator-${conditionCounter}">
+                        <option value="LIKE">포함</option>
+                        <option value="=">일치</option>
+                        <option value="!=">불일치</option>
+                        <option value=">">보다 큼</option>
+                        <option value="<">보다 작음</option>
+                        <option value=">=">이상</option>
+                        <option value="<=">이하</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>값</label>
+                    <input type="text" class="condition-value" id="condition-value-${conditionCounter}" placeholder="검색값 입력">
+                </div>
+                <div class="condition-actions">
+                    <button class="btn btn-danger btn-sm" onclick="removeCondition(${conditionCounter})">🗑️</button>
+                </div>
+                <div class="logic-operator">
+                    AND (그리고)
+                </div>
+            `;
+            
+            conditionsContainer.appendChild(conditionRow);
+        }
+
+        // 조건 제거
+        function removeCondition(id) {
+            const conditionElement = document.getElementById(`condition-${id}`);
+            if (conditionElement) {
+                conditionElement.remove();
+            }
+        }
+
+        // 다조건 검색 실행
+        function executeMultiSearch() {
+            if (!db || !currentTable) {
+                showStatus('테이블을 선택해주세요', 'error');
+                return;
+            }
+
+            const conditions = document.querySelectorAll('.condition-row');
+            if (conditions.length === 0) {
+                showStatus('검색 조건을 추가해주세요', 'error');
+                return;
+            }
+
+            const limit = document.getElementById('result-limit').value;
+            let query = `SELECT * FROM "${currentTable}"`;
+            let whereConditions = [];
+
+            conditions.forEach(condition => {
+                const column = condition.querySelector('.condition-column').value;
+                const operator = condition.querySelector('.condition-operator').value;
+                const value = condition.querySelector('.condition-value').value.trim();
+
+                if (column && value) {
+                    let conditionStr;
+                    if (operator === 'LIKE') {
+                        conditionStr = `"${column}" LIKE '%${value}%'`;
+                    } else {
+                        conditionStr = `"${column}" ${operator} '${value}'`;
+                    }
+                    whereConditions.push(conditionStr);
+                }
+            });
+
+            if (whereConditions.length > 0) {
+                query += ' WHERE ' + whereConditions.join(' AND ');
+            } else {
+                showStatus('유효한 검색 조건이 없습니다', 'error');
+                return;
+            }
+
+            if (limit > 0 && limit !== '0') {
+                query += ` LIMIT ${limit}`;
+            }
+
+            currentQuery = query;
+            executeQuery(query, '다조건 검색 실행');
+        }
+
+        // 다조건 검색 초기화
+        function clearMultiSearch() {
+            const conditionsContainer = document.getElementById('multi-search-conditions');
+            conditionsContainer.innerHTML = '';
+            conditionCounter = 0;
+        }
+
+        // 전체 데이터 보기
+        function showAllData() {
+            if (!db || !currentTable) return;
+            const limit = document.getElementById('result-limit').value;
+            let query = `SELECT * FROM "${currentTable}"`;
+            if (limit > 0 && limit !== '0') query += ` LIMIT ${limit}`;
+            currentQuery = query;
+            executeQuery(query, '전체 데이터 조회');
+        }
+
+        // 검색 실행
+        function executeSearch() {
+            if (!db || !currentTable) {
+                showStatus('테이블을 선택해주세요', 'error');
+                return;
+            }
+
+            const searchColumn = document.getElementById('search-column').value;
+            const searchOperator = document.getElementById('search-operator').value;
+            const searchValue = document.getElementById('search-value').value;
+            const limit = document.getElementById('result-limit').value;
+
+            if (!searchValue.trim() && !searchColumn) {
+                showAllData();
+                return;
+            }
+
+            let query = `SELECT * FROM "${currentTable}"`;
+            let whereConditions = [];
+
+            if (searchColumn && searchValue.trim()) {
+                let condition;
+                if (searchOperator === 'LIKE') {
+                    condition = `"${searchColumn}" LIKE '%${searchValue}%'`;
+                } else {
+                    condition = `"${searchColumn}" ${searchOperator} '${searchValue}'`;
+                }
+                whereConditions.push(condition);
+            }
+
+            if (!searchColumn && searchValue.trim()) {
+                const columnConditions = currentSchema.map(col => 
+                    `"${col.name}" LIKE '%${searchValue}%'`
+                );
+                whereConditions.push('(' + columnConditions.join(' OR ') + ')');
+            }
+
+            if (whereConditions.length > 0) {
+                query += ' WHERE ' + whereConditions.join(' AND ');
+            }
+
+            if (limit > 0 && limit !== '0') {
+                query += ` LIMIT ${limit}`;
+            }
+
+            currentQuery = query;
+            executeQuery(query, '검색 실행');
+        }
+
+        // 빠른 검색
+        function quickSearch(type) {
+            if (!db || !currentTable) return;
+
+            let query = '';
+            switch(type) {
+                case 'recent':
+                    query = `SELECT * FROM "${currentTable}" ORDER BY rowid DESC LIMIT 100`;
+                    break;
+            }
+
+            if (query) {
+                currentQuery = query;
+                executeQuery(query, '최근 데이터 조회');
+            }
+        }
+
+        // 행 개수 세기
+        function countRows() {
+            if (!db || !currentTable) return;
+            const query = `SELECT COUNT(*) as total_count FROM "${currentTable}"`;
+            currentQuery = query;
+            executeQuery(query, '행 개수 세기');
+        }
+
+        // 검색 초기화
+        function clearSearch() {
+            document.getElementById('search-value').value = '';
+            document.getElementById('search-column').selectedIndex = 0;
+            showAllData();
+        }
+
+        // 데이터 포맷팅 함수
+        function formatCellValue(value, columnName) {
+            if (value === null || value === undefined || value === '') {
+                return '-';
+            }
+
+            const stringValue = String(value).trim();
+
+            // 날짜 컬럼 포맷팅 (판매일, 배송일 등 - 시간 제거)
+            const dateColumns = ['판매일', '배송일', '날짜', 'date', '출고예정일', '배송예정일'];
+            const isDateColumn = dateColumns.some(dateCol => 
+                columnName.includes(dateCol)
+            );
+
+            if (isDateColumn) {
+                // YYYY-MM-DD HH:MM:SS 형식에서 날짜만 추출
+                if (stringValue.match(/^\d{4}-\d{2}-\d{2}/)) {
+                    return stringValue.split(' ')[0]; // 시간 부분 제거
+                }
+                // YYYYMMDD 형식 변환
+                if (stringValue.match(/^\d{8}$/)) {
+                    return stringValue.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+                }
+                // YYYYMM 형식 변환
+                if (stringValue.match(/^\d{6}$/)) {
+                    return stringValue.replace(/(\d{4})(\d{2})/, '$1-$2');
+                }
+            }
+
+            // YEAR 컬럼은 텍스트로 표시
+            if (columnName.includes('YEAR') || columnName === 'YEAR') {
+                return stringValue;
+            }
+
+            // 건수 컬럼은 소수점 2자리로 표시
+            if (columnName.includes('건수') || columnName.includes('COUNT') || columnName.includes('수량')) {
+                if (!isNaN(stringValue) && stringValue !== '') {
+                    const numValue = parseFloat(stringValue);
+                    return numValue.toFixed(2);
+                }
+            }
+
+            // D.C% 컬럼은 %로 표시
+            if (columnName.includes('D.C%') || columnName.includes('할인율') || columnName.includes('율')) {
+                if (!isNaN(stringValue) && stringValue !== '') {
+                    const numValue = parseFloat(stringValue);
+                    // 이미 %가 포함되어 있지 않은 경우에만 변환
+                    if (!stringValue.includes('%')) {
+                        return (numValue * 100).toFixed(1) + '%';
+                    }
+                }
+                return stringValue;
+            }
+
+            // 금액 관련 컬럼 (천단위 구분기호 추가, "원" 제거)
+            const moneyColumns = ['출고가', '공급가', '배송비', '사은품비', 'M/G', '가격', '금액', '비용'];
+            const isMoneyColumn = moneyColumns.some(moneyCol => 
+                columnName.includes(moneyCol)
+            );
+
+            if (isMoneyColumn && !isNaN(stringValue) && stringValue !== '') {
+                const numValue = parseFloat(stringValue);
+                if (Number.isInteger(numValue)) {
+                    return numValue.toLocaleString(); // "원" 제거
+                } else {
+                    return numValue.toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    }); // "원" 제거
+                }
+            }
+
+            // 일반 숫자 값 처리
+            if (!isNaN(stringValue) && stringValue !== '') {
+                const numValue = parseFloat(stringValue);
+                
+                // 0~1 사이의 소수점 값인 경우 %로 변환
+                if (numValue >= 0 && numValue <= 1 && stringValue.includes('.')) {
+                    const decimalPlaces = stringValue.split('.')[1].length;
+                    if (decimalPlaces >= 2) {
+                        return (numValue * 100).toFixed(1) + '%';
+                    }
+                }
+                
+                // 일반 숫자는 천단위 구분기호 추가
+                if (Number.isInteger(numValue)) {
+                    return numValue.toLocaleString();
+                } else {
+                    // 소수점 숫자는 적절한 자리수로 표시
+                    return numValue.toFixed(Math.min(2, stringValue.split('.')[1].length));
+                }
+            }
+
+            return stringValue;
+        }
+
+        // 컬럼 타입 판별
+        function getColumnType(columnName, value) {
+            if (value === null || value === undefined) return 'text';
+            
+            const stringValue = String(value);
+            
+            // 날짜 관련 컬럼
+            const dateColumns = ['판매일', '배송일', '날짜', 'date', '출고예정일', '배송예정일'];
+            const isDateColumn = dateColumns.some(dateCol => 
+                columnName.includes(dateCol)
+            );
+            
+            if (isDateColumn) {
+                return 'date';
+            }
+            
+            // YEAR 컬럼은 텍스트
+            if (columnName.includes('YEAR') || columnName === 'YEAR') {
+                return 'text';
+            }
+            
+            // 건수 컬럼은 소수점
+            if (columnName.includes('건수') || columnName.includes('COUNT') || columnName.includes('수량')) {
+                return 'decimal';
+            }
+            
+            // D.C% 컬럼은 퍼센트
+            if (columnName.includes('D.C%') || columnName.includes('할인율') || columnName.includes('율')) {
+                return 'percent';
+            }
+            
+            // 금액 관련 컬럼
+            const moneyColumns = ['출고가', '공급가', '배송비', '사은품비', 'M/G', '가격', '금액', '비용'];
+            const isMoneyColumn = moneyColumns.some(moneyCol => 
+                columnName.includes(moneyCol)
+            );
+            
+            if (isMoneyColumn) {
+                return 'money';
+            }
+            
+            // 숫자 값 확인
+            if (!isNaN(stringValue) && stringValue !== '') {
+                const numValue = parseFloat(stringValue);
+                // 0~1 사이의 소수점 값인 경우 퍼센트
+                if (numValue >= 0 && numValue <= 1 && stringValue.includes('.')) {
+                    const decimalPlaces = stringValue.split('.')[1].length;
+                    if (decimalPlaces >= 2) {
+                        return 'percent';
+                    }
+                }
+                return 'number';
+            }
+            
+            return 'text';
+        }
+
+        // 쿼리 실행
+        function executeQuery(query, description = '쿼리 실행') {
+            if (!db) return;
+
+            showStatus(`${description} 중...`, 'loading');
+
+            try {
+                const result = db.exec(query);
+                
+                if (result.length > 0) {
+                    const columns = result[0].columns;
+                    const values = result[0].values;
+                    totalRows = values.length;
+                    
+                    // 현재 결과 저장
+                    currentResults = {
+                        columns: columns,
+                        rows: values,
+                        query: query
+                    };
+                    
+                    displayResults(columns, values);
+                    updatePagination();
+                    updateResultCount();
+                    updateExportInfo();
+                    showStatus(`${description} 완료: ${totalRows.toLocaleString()}개 행`, 'success');
+                } else {
+                    currentResults = { columns: [], rows: [], query: query };
+                    displayResults([], []);
+                    totalRows = 0;
+                    updatePagination();
+                    updateResultCount();
+                    updateExportInfo();
+                    showStatus('결과가 없습니다', 'error');
+                }
+            } catch (error) {
+                showStatus('쿼리 실행 실패', 'error');
+            }
+        }
+
+        // 결과 개수 업데이트
+        function updateResultCount() {
+            const resultCountElement = document.getElementById('result-count');
+            if (totalRows > 0) {
+                resultCountElement.textContent = `(${totalRows.toLocaleString()}개 행)`;
+            } else {
+                resultCountElement.textContent = '';
+            }
+        }
+
+        // 내보내기 정보 업데이트
+        function updateExportInfo() {
+            const exportInfo = document.getElementById('export-info');
+            if (totalRows > 0) {
+                exportInfo.textContent = `현재 ${totalRows.toLocaleString()}개 행의 검색 결과를 내보냅니다`;
+            } else {
+                exportInfo.textContent = '현재 검색 결과를 내보냅니다';
+            }
+        }
+
+        // 결과 표시
+        function displayResults(columns, rows) {
+            const table = document.getElementById('results-table');
+            
+            if (rows.length === 0) {
+                table.innerHTML = `
+                    <tbody>
+                        <tr>
+                            <td colspan="100" style="text-align: center; padding: 40px 15px; color: #64748b;">
+                                <div style="font-size: 2.5em; margin-bottom: 10px; opacity: 0.5;">🔍</div>
+                                <div>검색 결과가 없습니다</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                `;
+                return;
+            }
+
+            let html = `
+                <thead>
+                    <tr>
+                        ${columns.map(col => `<th>${col}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, rows.length);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const row = rows[i];
+                html += '<tr>';
+                
+                row.forEach((cell, cellIndex) => {
+                    const columnName = columns[cellIndex];
+                    const formattedValue = formatCellValue(cell, columnName);
+                    const cellType = getColumnType(columnName, cell);
+                    
+                    let cellClass = '';
+                    switch(cellType) {
+                        case 'number':
+                            cellClass = 'number-cell';
+                            break;
+                        case 'decimal':
+                            cellClass = 'decimal-cell';
+                            break;
+                        case 'date':
+                            cellClass = 'date-cell';
+                            break;
+                        case 'percent':
+                            cellClass = 'percent-cell';
+                            break;
+                        case 'money':
+                            cellClass = 'money-cell';
+                            break;
+                        case 'text':
+                            cellClass = 'text-cell';
+                            break;
+                    }
+                    
+                    html += `<td class="${cellClass}" title="${cell !== null ? String(cell) : '-'}">${formattedValue}</td>`;
+                });
+                
+                html += '</tr>';
+            }
+            
+            html += '</tbody>';
+            table.innerHTML = html;
+
+            // 헤더 클릭 이벤트 추가
+            table.querySelectorAll('th').forEach((th, index) => {
+                th.onclick = () => sortByColumn(columns[index]);
+            });
+        }
+
+        // 컬럼 정렬
+        function sortByColumn(column) {
+            const query = `SELECT * FROM "${currentTable}" ORDER BY "${column}" LIMIT ${document.getElementById('result-limit').value}`;
+            currentQuery = query;
+            executeQuery(query, `${column} 기준 정렬`);
+        }
+
+        // 페이지네이션
+        function updatePagination() {
+            const totalPages = Math.ceil(totalRows / pageSize);
+            document.getElementById('page-info').textContent = 
+                `${currentPage} / ${totalPages} 페이지`;
+            
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = currentPage === totalPages || totalPages === 0;
+        }
+
+        function previousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                showAllData();
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(totalRows / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                showAllData();
+            }
+        }
+
+        // 현재 검색 결과를 Excel로 내보내기
+        function exportCurrentResultsToExcel() {
+            if (currentResults.rows.length === 0) {
+                showStatus('내보낼 데이터가 없습니다', 'error');
+                return;
+            }
+
+            try {
+                const columns = currentResults.columns;
+                const rows = currentResults.rows;
+
+                // 워크시트 데이터 생성
+                const wsData = [columns]; // 헤더 행
+                
+                // 데이터 행 추가 (포맷팅된 데이터 사용)
+                rows.forEach(row => {
+                    const rowData = columns.map((col, index) => {
+                        const cell = row[index];
+                        return formatCellValue(cell, col);
+                    });
+                    wsData.push(rowData);
+                });
+
+                // 워크북 생성
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                // 컬럼 너비 자동 조정
+                const colWidths = columns.map((col, index) => {
+                    const maxLength = Math.max(
+                        col.length,
+                        ...rows.map(row => {
+                            const cell = row[index];
+                            return String(formatCellValue(cell, col)).length;
+                        })
+                    );
+                    return { width: Math.min(Math.max(maxLength, 8), 50) };
+                });
+                ws['!cols'] = colWidths;
+
+                // 워크시트 추가
+                const sheetName = currentTable.length > 25 ? currentTable.substring(0, 25) : currentTable;
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+                // 파일 저장
+                const fileName = `${currentTable}_검색결과_${new Date().toISOString().split('T')[0]}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+
+                showStatus(`검색 결과 ${rows.length.toLocaleString()}개 행을 Excel로 내보냈습니다`, 'success');
+            } catch (error) {
+                showStatus('Excel 내보내기 실패: ' + error.message, 'error');
+            }
+        }
+
+        // 현재 검색 결과를 CSV로 내보내기
+        function exportCurrentResultsToCSV() {
+            if (currentResults.rows.length === 0) {
+                showStatus('내보낼 데이터가 없습니다', 'error');
+                return;
+            }
+
+            try {
+                const columns = currentResults.columns;
+                const rows = currentResults.rows;
+
+                let csv = columns.join(',') + '\n';
+                rows.forEach(row => {
+                    const csvRow = columns.map((col, index) => {
+                        const cell = row[index];
+                        const formattedValue = formatCellValue(cell, col);
+                        let cellStr = String(formattedValue);
+                        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                            cellStr = '"' + cellStr.replace(/"/g, '""') + '"';
+                        }
+                        return cellStr;
+                    });
+                    csv += csvRow.join(',') + '\n';
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `${currentTable}_검색결과_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showStatus(`검색 결과 ${rows.length.toLocaleString()}개 행을 CSV로 내보냈습니다`, 'success');
+            } catch (error) {
+                showStatus('CSV 내보내기 실패', 'error');
+            }
+        }
+
+        // 상태 메시지 표시
+        function showStatus(message, type) {
+            const statusArea = document.getElementById('status-area');
+            statusArea.innerHTML = `<div class="status ${type}">${message}</div>`;
+            
+            if (type !== 'error' && type !== 'loading') {
+                setTimeout(() => {
+                    statusArea.innerHTML = '';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

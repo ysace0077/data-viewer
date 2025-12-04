@@ -1,0 +1,2065 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Viewer Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+    color: #212529;
+    line-height: 1.6;
+}
+
+/* 배경 패턴 효과 */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.01) 2px, rgba(0,0,0,0.01) 4px),
+        repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,0.01) 2px, rgba(0,0,0,0.01) 4px);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    position: relative;
+    z-index: 1;
+}
+
+/* 헤더 */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    animation: fadeInDown 0.6s ease-out;
+    padding: 20px 0;
+}
+
+.header h1 {
+    font-size: 2.8em;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 12px;
+    letter-spacing: -1px;
+}
+
+.header p {
+    color: #6c757d;
+    font-size: 1.1em;
+    font-weight: 400;
+    letter-spacing: 0.3px;
+}
+
+/* 탭 컨테이너 */
+.tab-container {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 32px;
+    padding: 8px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 14px 32px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+    color: #6c757d;
+    letter-spacing: 0.5px;
+}
+
+.tab-btn:hover {
+    background: #f8f9fa;
+    color: #495057;
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+/* 카드 스타일 */
+.card {
+    background: white;
+    border: none;
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    animation: fadeInUp 0.6s ease-out;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* 업로드 섹션 */
+.upload-section {
+    padding: 32px;
+    text-align: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-bottom: 1px solid #e9ecef;
+}
+
+.upload-section h3 {
+    font-size: 1.3em;
+    color: #212529;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.file-input label {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 40px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.file-input label:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(102, 126, 234, 0.4);
+}
+
+.file-input input {
+    display: none;
+}
+
+.file-info {
+    margin-top: 16px;
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    color: #495057;
+    font-weight: 500;
+    font-size: 0.9em;
+    border: 1px solid #dee2e6;
+}
+
+/* 탭 컨텐츠 */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* 검색 패널 */
+.search-panel {
+    padding: 32px;
+}
+
+.search-panel h3 {
+    color: #212529;
+    margin-bottom: 28px;
+    font-size: 1.4em;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.search-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    color: #495057;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    font-size: 14px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #f8f9fa;
+    color: #212529;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 18px;
+    padding-right: 42px;
+}
+
+select:hover {
+    border-color: #adb5bd;
+    background: white;
+}
+
+select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    background: white;
+}
+
+select option {
+    background: white;
+    color: #212529;
+    padding: 12px;
+}
+
+.search-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-top: 28px;
+    align-items: center;
+}
+
+.btn {
+    padding: 14px 28px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: inherit;
+    letter-spacing: 0.3px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: #6c757d;
+    border: 2px solid #dee2e6;
+}
+
+.btn-secondary:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: #495057;
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+}
+
+.btn-success:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(16, 185, 129, 0.4);
+}
+
+.export-info {
+    font-size: 0.85em;
+    color: #6c757d;
+    text-align: center;
+    font-weight: 500;
+    grid-column: 1 / -1;
+    margin-top: 12px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+/* 결과 패널 */
+.results-panel {
+    background: white;
+    border: none;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.results-header {
+    padding: 24px 32px;
+    border-bottom: 2px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.results-header h3 {
+    color: #212529;
+    font-size: 1.4em;
+    font-weight: 600;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: #495057;
+    font-size: 0.95em;
+    font-weight: 600;
+}
+
+.pagination-btn {
+    padding: 10px 18px;
+    border: 2px solid #dee2e6;
+    background: white;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    color: #495057;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    border-color: #667eea;
+    background: #f8f9fa;
+    color: #667eea;
+    transform: translateY(-2px);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* 카드 뷰 */
+.card-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    padding: 32px;
+    gap: 24px;
+    background: #f8f9fa;
+}
+
+.data-card {
+    background: white;
+    border: none;
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.data-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+}
+
+.data-card:hover {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+    transform: translateY(-4px);
+}
+
+.card-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.card-customer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.card-number {
+    font-size: 1.3em;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.card-name {
+    font-size: 1.2em;
+    font-weight: 700;
+    color: #212529;
+}
+
+.card-location {
+    font-size: 0.85em;
+    color: #6c757d;
+    padding: 6px 12px;
+    background: #e9ecef;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.card-section {
+    display: flex;
+    align-items: flex-start;
+    font-size: 0.95em;
+    line-height: 1.7;
+    padding: 6px 0;
+}
+
+.card-content {
+    flex: 1;
+}
+
+.card-label {
+    font-weight: 700;
+    color: #6c757d;
+    min-width: 80px;
+    display: inline-block;
+}
+
+.card-value {
+    color: #212529;
+    margin-left: 8px;
+    font-weight: 500;
+}
+
+.card-value.product {
+    color: #667eea;
+    font-weight: 700;
+}
+
+.card-value.money {
+    color: #10b981;
+    font-weight: 800;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.card-value.discount {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.card-value.gift {
+    color: #8b5cf6;
+    font-weight: 700;
+}
+
+.card-value.repurchase {
+    color: #10b981;
+    font-weight: 700;
+    background: #d1fae5;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.85em;
+}
+
+.card-value.seller {
+    color: #212529;
+    font-weight: 700;
+}
+
+.card-value.discount-rate {
+    color: #f97316;
+    font-weight: 800;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+/* 상태 메시지 */
+.status {
+    padding: 18px 28px;
+    margin: 20px 0;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 1em;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border: none;
+}
+
+.status.info {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    color: #1e40af;
+}
+
+.status.success {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    color: #065f46;
+}
+
+.status.error {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #991b1b;
+}
+
+.status.loading {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 100px 20px;
+    color: #adb5bd;
+}
+
+.empty-state .icon {
+    font-size: 5em;
+    margin-bottom: 24px;
+    opacity: 0.3;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 1200px) {
+    .search-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .search-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .card-view {
+        grid-template-columns: 1fr;
+    }
+    
+    .search-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 16px;
+    }
+    
+    .header h1 {
+        font-size: 1.8em;
+    }
+    
+    .search-panel {
+        padding: 16px;
+    }
+    
+    .search-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .search-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .tab-container {
+        gap: 8px;
+    }
+    
+    .tab-btn {
+        padding: 8px 24px;
+        font-size: 14px;
+    }
+    
+    .card-view {
+        padding: 16px;
+        gap: 16px;
+    }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>✨ Data Viewer Pro</h1>
+        <p>Advanced Database Analytics Platform</p>
+    </div>
+
+    <!-- 파일 업로드 -->
+    <div class="card">
+        <div class="upload-section">
+            <h3>📁 데이터베이스 파일 선택</h3>
+            <div class="file-input">
+                <label for="db-file">
+                    <span>📂</span>
+                    <span>파일 선택하기</span>
+                </label>
+                <input type="file" id="db-file" accept=".db,.sqlite,.sqlite3">
+            </div>
+            <div class="file-info" id="file-info">선택된 파일이 없습니다</div>
+            <div id="upload-status"></div>
+        </div>
+    </div>
+
+    <!-- 탭 버튼 -->
+    <div class="tab-container">
+        <button class="tab-btn active" onclick="switchTab('ACE')">ACE</button>
+        <button class="tab-btn" onclick="switchTab('ESSA')">ESSA</button>
+    </div>
+
+    <!-- ACE 탭 -->
+    <div id="ace-tab" class="tab-content active">
+        <div class="card">
+            <div class="search-panel">
+                <h3>🔍 검색 조건</h3>
+                <div class="search-grid">
+                    <div class="form-group">
+                        <label>YEAR</label>
+                        <select id="ace-year" onchange="handleYearMonthChange('ACE')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>MONTH</label>
+                        <select id="ace-month" onchange="handleYearMonthChange('ACE')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>고객명</label>
+                        <select id="ace-customer">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>상품명</label>
+                        <select id="ace-product">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>지역1</label>
+                        <select id="ace-region1" onchange="handleRegion1Change('ACE')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>지역2</label>
+                        <select id="ace-region2" onchange="handleRegion2Change('ACE')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>지역3</label>
+                        <select id="ace-region3">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="search-actions">
+                    <button class="btn btn-primary" onclick="executeSearch('ACE')">검색 실행</button>
+                    <button class="btn btn-secondary" onclick="clearSearch('ACE')">초기화</button>
+                    <button class="btn btn-success" onclick="exportToExcel('ACE')">Excel 내보내기</button>
+                    <div class="export-info" id="ace-export-info">현재 검색 결과를 내보냅니다</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-panel">
+            <div class="results-header">
+                <h3>📋 검색 결과 <span id="ace-result-count" style="font-size: 0.7em; color: #94a3b8; font-weight: 500;"></span></h3>
+                <div class="pagination">
+                    <button class="pagination-btn" onclick="previousPage('ACE')" id="ace-prev-btn">◀</button>
+                    <span id="ace-page-info">1 페이지</span>
+                    <button class="pagination-btn" onclick="nextPage('ACE')" id="ace-next-btn">▶</button>
+                </div>
+            </div>
+            <div class="card-view" id="ace-card-view">
+                <div style="grid-column: 1 / -1; text-align: center; padding: 80px 20px; color: #64748b;">
+                    <div style="font-size: 4em; margin-bottom: 20px; opacity: 0.4;">📇</div>
+                    <div style="font-size: 1.2em; font-weight: 600;">데이터를 검색해주세요</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ESSA 탭 -->
+    <div id="essa-tab" class="tab-content">
+        <div class="card">
+            <div class="search-panel">
+                <h3>🔍 검색 조건</h3>
+                <div class="search-grid">
+                    <div class="form-group">
+                        <label>YEAR</label>
+                        <select id="essa-year" onchange="handleYearMonthChange('ESSA')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>MONTH</label>
+                        <select id="essa-month" onchange="handleYearMonthChange('ESSA')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>고객명</label>
+                        <select id="essa-customer">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>상품명</label>
+                        <select id="essa-product">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>지역1</label>
+                        <select id="essa-region1" onchange="handleRegion1Change('ESSA')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>지역2</label>
+                        <select id="essa-region2" onchange="handleRegion2Change('ESSA')">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>지역3</label>
+                        <select id="essa-region3">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="search-actions">
+                    <button class="btn btn-primary" onclick="executeSearch('ESSA')">검색 실행</button>
+                    <button class="btn btn-secondary" onclick="clearSearch('ESSA')">초기화</button>
+                    <button class="btn btn-success" onclick="exportToExcel('ESSA')">Excel 내보내기</button>
+                    <div class="export-info" id="essa-export-info">현재 검색 결과를 내보냅니다</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-panel">
+            <div class="results-header">
+                <h3>📋 검색 결과 <span id="essa-result-count" style="font-size: 0.7em; color: #94a3b8; font-weight: 500;"></span></h3>
+                <div class="pagination">
+                    <button class="pagination-btn" onclick="previousPage('ESSA')" id="essa-prev-btn">◀</button>
+                    <span id="essa-page-info">1 페이지</span>
+                    <button class="pagination-btn" onclick="nextPage('ESSA')" id="essa-next-btn">▶</button>
+                </div>
+            </div>
+            <div class="card-view" id="essa-card-view">
+                <div style="grid-column: 1 / -1; text-align: center; padding: 80px 20px; color: #64748b;">
+                    <div style="font-size: 4em; margin-bottom: 20px; opacity: 0.4;">📇</div>
+                    <div style="font-size: 1.2em; font-weight: 600;">데이터를 검색해주세요</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="status-area"></div>
+</div>
+
+<script>
+let db = null;
+let currentTab = 'ACE';
+let aceResults = { columns: [], rows: [], currentPage: 1, pageSize: 50 };
+let essaResults = { columns: [], rows: [], currentPage: 1, pageSize: 50 };
+let customerPurchaseHistory = new Map();
+
+// 드롭다운 옵션 저장
+let aceDropdownOptions = {
+    year: new Set(),
+    month: new Set(),
+    customer: new Set(),
+    region1: new Set(),
+    region2: new Set(),
+    region3: new Set(),
+    product: new Set()
+};
+
+let essaDropdownOptions = {
+    year: new Set(),
+    month: new Set(),
+    customer: new Set(),
+    region1: new Set(),
+    region2: new Set(),
+    region3: new Set(),
+    product: new Set()
+};
+
+// 전체 데이터 캐시
+let aceAllData = [];
+let essaAllData = [];
+
+// SQL.js 초기화
+function initializeSQL() {
+    if (typeof initSqlJs === 'undefined') {
+        document.getElementById('upload-status').innerHTML = '<div class="status loading">⏳ SQL.js 라이브러리를 로드하는 중입니다...</div>';
+        setTimeout(initializeSQL, 1000);
+        return;
+    }
+
+    const config = {
+        locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}`
+    };
+
+    initSqlJs(config).then(function(SQL) {
+        window.SQL = SQL;
+        showStatus('✅ SQL.js 라이브러리가 로드되었습니다. 데이터베이스 파일을 선택해주세요.', 'success');
+        
+        const fileInput = document.getElementById('db-file');
+        fileInput.addEventListener('change', handleFileSelect);
+    }).catch(function(error) {
+        showStatus('❌ SQL.js 라이브러리 로드 실패: ' + error.message, 'error');
+        console.error('SQL.js 로드 오류:', error);
+    });
+}
+
+// 페이지 로드 시 초기화
+document.addEventListener('DOMContentLoaded', function() {
+    showStatus('🚀 애플리케이션을 초기화하는 중...', 'loading');
+    initializeSQL();
+});
+
+// 파일 선택 핸들러
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        showStatus('⚠️ 파일을 선택해주세요.', 'error');
+        return;
+    }
+
+    document.getElementById('file-info').textContent = `선택된 파일: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+    showStatus('⏳ 데이터베이스 파일을 불러오는 중...', 'loading');
+
+    const reader = new FileReader();
+    reader.onload = function() {
+        try {
+            const Uints = new Uint8Array(reader.result);
+            db = new SQL.Database(Uints);
+            showStatus('⏳ 데이터베이스 로드 중... ACE 및 ESSA 데이터를 불러오는 중입니다', 'loading');
+            
+            // 드롭다운 옵션 로드
+            loadDropdownOptions('ACE');
+            loadDropdownOptions('ESSA');
+            
+            // 최종 완료 메시지 (약간의 지연 후)
+            setTimeout(() => {
+                const aceCount = aceAllData.length;
+                const essaCount = essaAllData.length;
+                showStatus(`✅ 모든 데이터 로드 완료! ACE: ${aceCount.toLocaleString()}개, ESSA: ${essaCount.toLocaleString()}개 - 검색 가능`, 'success');
+            }, 500);
+        } catch (error) {
+            showStatus('❌ 파일 로드 실패: ' + error.message, 'error');
+            console.error('File load error:', error);
+        }
+    };
+
+    reader.onerror = function() {
+        showStatus('❌ 파일 읽기 오류가 발생했습니다', 'error');
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+// 드롭다운 옵션 로드
+function loadDropdownOptions(tabName) {
+    if (!db) return;
+    
+    const tableName = `data_(${tabName})`;
+    const options = tabName === 'ACE' ? aceDropdownOptions : essaDropdownOptions;
+    
+    try {
+        // 전체 데이터 로드
+        const query = `SELECT * FROM "${tableName}"`;
+        const result = db.exec(query);
+        
+        if (result.length > 0) {
+            const columns = result[0].columns;
+            const rows = result[0].values;
+            
+            // 데이터 캐시 저장
+            if (tabName === 'ACE') {
+                aceAllData = rows.map(row => {
+                    const obj = {};
+                    columns.forEach((col, idx) => {
+                        obj[col] = row[idx];
+                    });
+                    return obj;
+                });
+            } else {
+                essaAllData = rows.map(row => {
+                    const obj = {};
+                    columns.forEach((col, idx) => {
+                        obj[col] = row[idx];
+                    });
+                    return obj;
+                });
+            }
+            
+            // 초기 드롭다운 옵션 설정
+            const columnMap = {
+                'YEAR': 'year',
+                'MONTH': 'month',
+                '고객명': 'customer',
+                '지역1': 'region1',
+                '지역2': 'region2',
+                '지역3': 'region3',
+                '상품명': 'product'
+            };
+            
+            Object.keys(columnMap).forEach(col => {
+                const key = columnMap[col];
+                options[key].clear();
+                
+                const colIndex = columns.indexOf(col);
+                if (colIndex !== -1) {
+                    rows.forEach(row => {
+                        if (row[colIndex] && row[colIndex] !== '') {
+                            options[key].add(row[colIndex]);
+                        }
+                    });
+                }
+            });
+        }
+        
+        // 드롭다운 업데이트
+        updateDropdowns(tabName);
+        
+        // YEAR, MONTH 기본값을 "전체"로 설정
+        const prefix = tabName.toLowerCase();
+        document.getElementById(`${prefix}-year`).value = '';
+        document.getElementById(`${prefix}-month`).value = '';
+        
+    } catch (error) {
+        console.error('드롭다운 옵션 로드 실패:', error);
+        showStatus(`❌ ${tabName} 데이터 로드 실패: ${error.message}`, 'error');
+    }
+}
+
+// 드롭다운 업데이트
+function updateDropdowns(tabName, specificDropdowns = null) {
+    const prefix = tabName.toLowerCase();
+    const options = tabName === 'ACE' ? aceDropdownOptions : essaDropdownOptions;
+    
+    const allDropdowns = {
+        year: document.getElementById(`${prefix}-year`),
+        month: document.getElementById(`${prefix}-month`),
+        customer: document.getElementById(`${prefix}-customer`),
+        region1: document.getElementById(`${prefix}-region1`),
+        region2: document.getElementById(`${prefix}-region2`),
+        region3: document.getElementById(`${prefix}-region3`),
+        product: document.getElementById(`${prefix}-product`)
+    };
+    
+    const dropdownsToUpdate = specificDropdowns || Object.keys(allDropdowns);
+    
+    dropdownsToUpdate.forEach(key => {
+        const dropdown = allDropdowns[key];
+        if (!dropdown) return;
+        
+        const currentValue = dropdown.value;
+        
+        // 기존 옵션 제거 (첫 번째 "전체" 옵션 제외)
+        while (dropdown.options.length > 1) {
+            dropdown.remove(1);
+        }
+        
+        // 새 옵션 추가
+        const sortedOptions = Array.from(options[key]).sort((a, b) => {
+            // 숫자인 경우 숫자로 정렬
+            if (!isNaN(a) && !isNaN(b)) {
+                return Number(a) - Number(b);
+            }
+            // 문자열인 경우 문자열로 정렬
+            return String(a).localeCompare(String(b), 'ko');
+        });
+        
+        sortedOptions.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            dropdown.appendChild(option);
+        });
+        
+        // 이전 선택값 복원 또는 YEAR/MONTH는 "전체"로 기본 설정
+        if (currentValue && options[key].has(currentValue)) {
+            dropdown.value = currentValue;
+        } else if ((key === 'year' || key === 'month') && !currentValue) {
+            dropdown.value = '';  // "전체" 선택
+        }
+    });
+}
+
+// YEAR/MONTH 변경 시 종속 데이터 필터링
+function handleYearMonthChange(tabName) {
+    const prefix = tabName.toLowerCase();
+    const allData = tabName === 'ACE' ? aceAllData : essaAllData;
+    const options = tabName === 'ACE' ? aceDropdownOptions : essaDropdownOptions;
+    
+    const year = document.getElementById(`${prefix}-year`).value;
+    const month = document.getElementById(`${prefix}-month`).value;
+    
+    // 필터링된 데이터
+    let filteredData = allData;
+    
+    if (year) {
+        filteredData = filteredData.filter(row => row['YEAR'] == year);
+    }
+    if (month) {
+        filteredData = filteredData.filter(row => row['MONTH'] == month);
+    }
+    
+    // 종속 드롭다운 옵션 업데이트
+    ['customer', 'region1', 'region2', 'region3', 'product'].forEach(key => {
+        const colMap = {
+            'customer': '고객명',
+            'region1': '지역1',
+            'region2': '지역2',
+            'region3': '지역3',
+            'product': '상품명'
+        };
+        
+        options[key].clear();
+        filteredData.forEach(row => {
+            const value = row[colMap[key]];
+            if (value && value !== '') {
+                options[key].add(value);
+            }
+        });
+    });
+    
+    // 드롭다운 UI 업데이트
+    updateDropdowns(tabName, ['customer', 'region1', 'region2', 'region3', 'product']);
+}
+
+// 지역1 변경 시 지역2 필터링
+function handleRegion1Change(tabName) {
+    const prefix = tabName.toLowerCase();
+    const allData = tabName === 'ACE' ? aceAllData : essaAllData;
+    const options = tabName === 'ACE' ? aceDropdownOptions : essaDropdownOptions;
+    
+    const year = document.getElementById(`${prefix}-year`).value;
+    const month = document.getElementById(`${prefix}-month`).value;
+    const region1 = document.getElementById(`${prefix}-region1`).value;
+    
+    // 필터링된 데이터
+    let filteredData = allData;
+    
+    if (year) {
+        filteredData = filteredData.filter(row => row['YEAR'] == year);
+    }
+    if (month) {
+        filteredData = filteredData.filter(row => row['MONTH'] == month);
+    }
+    if (region1) {
+        filteredData = filteredData.filter(row => row['지역1'] == region1);
+    }
+    
+    // 지역2, 지역3 옵션 업데이트
+    options.region2.clear();
+    options.region3.clear();
+    
+    filteredData.forEach(row => {
+        if (row['지역2'] && row['지역2'] !== '') {
+            options.region2.add(row['지역2']);
+        }
+        if (row['지역3'] && row['지역3'] !== '') {
+            options.region3.add(row['지역3']);
+        }
+    });
+    
+    // 드롭다운 UI 업데이트
+    updateDropdowns(tabName, ['region2', 'region3']);
+    
+    // 지역2, 지역3 선택 초기화
+    document.getElementById(`${prefix}-region2`).value = '';
+    document.getElementById(`${prefix}-region3`).value = '';
+}
+
+// 지역2 변경 시 지역3 필터링
+function handleRegion2Change(tabName) {
+    const prefix = tabName.toLowerCase();
+    const allData = tabName === 'ACE' ? aceAllData : essaAllData;
+    const options = tabName === 'ACE' ? aceDropdownOptions : essaDropdownOptions;
+    
+    const year = document.getElementById(`${prefix}-year`).value;
+    const month = document.getElementById(`${prefix}-month`).value;
+    const region1 = document.getElementById(`${prefix}-region1`).value;
+    const region2 = document.getElementById(`${prefix}-region2`).value;
+    
+    // 필터링된 데이터
+    let filteredData = allData;
+    
+    if (year) {
+        filteredData = filteredData.filter(row => row['YEAR'] == year);
+    }
+    if (month) {
+        filteredData = filteredData.filter(row => row['MONTH'] == month);
+    }
+    if (region1) {
+        filteredData = filteredData.filter(row => row['지역1'] == region1);
+    }
+    if (region2) {
+        filteredData = filteredData.filter(row => row['지역2'] == region2);
+    }
+    
+    // 지역3 옵션 업데이트
+    options.region3.clear();
+    
+    filteredData.forEach(row => {
+        if (row['지역3'] && row['지역3'] !== '') {
+            options.region3.add(row['지역3']);
+        }
+    });
+    
+    // 드롭다운 UI 업데이트
+    updateDropdowns(tabName, ['region3']);
+    
+    // 지역3 선택 초기화
+    document.getElementById(`${prefix}-region3`).value = '';
+}
+
+// 탭 전환
+function switchTab(tabName) {
+    currentTab = tabName;
+    
+    // 탭 버튼 활성화
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent === tabName) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // 탭 컨텐츠 표시
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    if (tabName === 'ACE') {
+        document.getElementById('ace-tab').classList.add('active');
+    } else {
+        document.getElementById('essa-tab').classList.add('active');
+    }
+}
+
+// 검색 실행
+function executeSearch(tabName) {
+    if (!db) {
+        showStatus('⚠️ 데이터베이스 파일을 먼저 업로드해주세요', 'error');
+        return;
+    }
+
+    const tableName = `data_(${tabName})`;
+    const prefix = tabName.toLowerCase();
+    
+    const year = document.getElementById(`${prefix}-year`).value.trim();
+    const month = document.getElementById(`${prefix}-month`).value.trim();
+    const customer = document.getElementById(`${prefix}-customer`).value.trim();
+    const region1 = document.getElementById(`${prefix}-region1`).value.trim();
+    const region2 = document.getElementById(`${prefix}-region2`).value.trim();
+    const region3 = document.getElementById(`${prefix}-region3`).value.trim();
+    const product = document.getElementById(`${prefix}-product`).value.trim();
+
+    let query = `SELECT * FROM "${tableName}"`;
+    let conditions = [];
+
+    if (year) conditions.push(`"YEAR" = '${year}'`);
+    if (month) conditions.push(`"MONTH" = '${month}'`);
+    if (customer) conditions.push(`"고객명" = '${customer}'`);
+    if (region1) conditions.push(`"지역1" = '${region1}'`);
+    if (region2) conditions.push(`"지역2" = '${region2}'`);
+    if (region3) conditions.push(`"지역3" = '${region3}'`);
+    if (product) conditions.push(`"상품명" = '${product}'`);
+
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    try {
+        showStatus('🔍 검색 중...', 'loading');
+        const result = db.exec(query);
+
+        if (result.length > 0) {
+            const columns = result[0].columns;
+            const rows = result[0].values;
+
+            if (tabName === 'ACE') {
+                aceResults.columns = columns;
+                aceResults.rows = rows;
+                aceResults.currentPage = 1;
+            } else {
+                essaResults.columns = columns;
+                essaResults.rows = rows;
+                essaResults.currentPage = 1;
+            }
+
+            updateCustomerPurchaseHistory(columns, rows);
+            displayResults(tabName);
+            updatePagination(tabName);
+            updateResultCount(tabName);
+            updateExportInfo(tabName);
+            showStatus(`✅ 검색 완료: ${rows.length.toLocaleString()}개 행`, 'success');
+        } else {
+            if (tabName === 'ACE') {
+                aceResults = { columns: [], rows: [], currentPage: 1, pageSize: 50 };
+            } else {
+                essaResults = { columns: [], rows: [], currentPage: 1, pageSize: 50 };
+            }
+            displayResults(tabName);
+            updatePagination(tabName);
+            updateResultCount(tabName);
+            updateExportInfo(tabName);
+            showStatus('⚠️ 결과가 없습니다', 'error');
+        }
+    } catch (error) {
+        showStatus('❌ 검색 실패: ' + error.message, 'error');
+        console.error('Query error:', error);
+    }
+}
+
+// 검색 초기화
+function clearSearch(tabName) {
+    const prefix = tabName.toLowerCase();
+    
+    document.getElementById(`${prefix}-year`).value = '';
+    document.getElementById(`${prefix}-month`).value = '';
+    document.getElementById(`${prefix}-customer`).value = '';
+    document.getElementById(`${prefix}-region1`).value = '';
+    document.getElementById(`${prefix}-region2`).value = '';
+    document.getElementById(`${prefix}-region3`).value = '';
+    document.getElementById(`${prefix}-product`).value = '';
+    
+    // 드롭다운 옵션 복원
+    loadDropdownOptions(tabName);
+
+    if (tabName === 'ACE') {
+        aceResults = { columns: [], rows: [], currentPage: 1, pageSize: 50 };
+    } else {
+        essaResults = { columns: [], rows: [], currentPage: 1, pageSize: 50 };
+    }
+
+    displayResults(tabName);
+    updatePagination(tabName);
+    updateResultCount(tabName);
+    updateExportInfo(tabName);
+    
+    showStatus('🔄 검색 조건이 초기화되었습니다', 'info');
+}
+
+// 고객별 구매 이력 업데이트
+function updateCustomerPurchaseHistory(columns, rows) {
+    customerPurchaseHistory.clear();
+    
+    const customerField = columns.find(col => col.includes('고객') || col.includes('이름'));
+    const dateField = columns.find(col => col.includes('판매일') || col.includes('날짜'));
+    
+    if (!customerField || !dateField) return;
+    
+    const customerIndex = columns.indexOf(customerField);
+    const dateIndex = columns.indexOf(dateField);
+    
+    rows.forEach(row => {
+        const customerName = row[customerIndex];
+        const dateValue = row[dateIndex];
+        
+        if (customerName && dateValue) {
+            if (!customerPurchaseHistory.has(customerName)) {
+                customerPurchaseHistory.set(customerName, []);
+            }
+            customerPurchaseHistory.get(customerName).push(dateValue);
+        }
+    });
+    
+    customerPurchaseHistory.forEach((dates, customer) => {
+        dates.sort((a, b) => new Date(a) - new Date(b));
+    });
+}
+
+// 재구매 정보 확인
+function getRepurchaseInfo(customerName, currentDate) {
+    if (!customerPurchaseHistory.has(customerName)) return null;
+    
+    const purchaseDates = customerPurchaseHistory.get(customerName);
+    const currentDateObj = new Date(currentDate);
+    
+    const previousPurchases = purchaseDates.filter(date => {
+        const dateObj = new Date(date);
+        return dateObj < currentDateObj;
+    });
+    
+    if (previousPurchases.length > 0) {
+        const lastPurchase = previousPurchases[previousPurchases.length - 1];
+        return {
+            isRepurchase: true,
+            lastPurchaseDate: lastPurchase,
+            purchaseCount: previousPurchases.length + 1
+        };
+    }
+    
+    return null;
+}
+
+// 결과 표시
+function displayResults(tabName) {
+    const results = tabName === 'ACE' ? aceResults : essaResults;
+    const cardView = document.getElementById(`${tabName.toLowerCase()}-card-view`);
+    
+    if (results.rows.length === 0) {
+        cardView.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 80px 20px; color: #64748b;">
+                <div style="font-size: 4em; margin-bottom: 20px; opacity: 0.4;">🔍</div>
+                <div style="font-size: 1.2em; font-weight: 600;">검색 결과가 없습니다</div>
+            </div>
+        `;
+        return;
+    }
+
+    const startIndex = (results.currentPage - 1) * results.pageSize;
+    const endIndex = Math.min(startIndex + results.pageSize, results.rows.length);
+    
+    const customerField = results.columns.find(col => col.includes('고객') || col.includes('이름'));
+    const dateField = results.columns.find(col => col.includes('판매일') || col.includes('날짜'));
+    
+    if (customerField && dateField) {
+        const customerDateGroups = {};
+        
+        for (let i = startIndex; i < endIndex; i++) {
+            const row = results.rows[i];
+            const customerName = row[results.columns.indexOf(customerField)];
+            const dateValue = row[results.columns.indexOf(dateField)];
+            const key = `${customerName}_${dateValue}` || '미지정';
+            
+            if (!customerDateGroups[key]) {
+                customerDateGroups[key] = [];
+            }
+            customerDateGroups[key].push({ row, index: i + 1 });
+        }
+        
+        let html = '';
+        Object.keys(customerDateGroups).forEach(key => {
+            const records = customerDateGroups[key];
+            const customerName = key.split('_')[0];
+            html += createGroupedDataCard(results.columns, records, customerName);
+        });
+        
+        cardView.innerHTML = html;
+    } else {
+        let html = '';
+        for (let i = startIndex; i < endIndex; i++) {
+            const row = results.rows[i];
+            html += createSingleDataCard(results.columns, row, i + 1);
+        }
+        cardView.innerHTML = html;
+    }
+}
+
+// 그룹화된 카드 생성
+function createGroupedDataCard(columns, records, customerName) {
+    const firstRecord = records[0].row;
+    const dateField = columns.find(col => col.includes('판매일') || col.includes('날짜'));
+    const dateValue = dateField ? firstRecord[columns.indexOf(dateField)] : null;
+    
+    let repurchaseInfo = null;
+    if (dateValue && customerName) {
+        repurchaseInfo = getRepurchaseInfo(customerName, dateValue);
+    }
+    
+    const sellerField = columns.find(col => col.includes('판매자') || col.includes('담당자'));
+    const sellerValue = sellerField ? firstRecord[columns.indexOf(sellerField)] : null;
+    
+    const locationInfo = extractLocationInfo(columns, firstRecord);
+    
+    let cardHTML = `
+        <div class="data-card">
+            <div class="card-header">
+                <div class="card-customer">
+                    <div class="card-number">${records[0].index}.</div>
+                    <div class="card-name">${customerName}</div>
+                    ${locationInfo ? `<div class="card-location">${locationInfo}</div>` : ''}
+                </div>
+            </div>
+            <div class="card-body">
+    `;
+    
+    if (dateValue) {
+        cardHTML += `
+            <div class="card-section">
+                <div class="card-content">
+                    <span class="card-label">판매일:</span>
+                    <span class="card-value">${formatDateForCard(dateValue, dateField)}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (repurchaseInfo && repurchaseInfo.isRepurchase) {
+        cardHTML += `
+            <div class="card-section">
+                <div class="card-content">
+                    <span class="card-label">재구매:</span>
+                    <span class="card-value repurchase">${repurchaseInfo.purchaseCount}번째 구매 (이전: ${formatDateForCard(repurchaseInfo.lastPurchaseDate, dateField)})</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (sellerValue && sellerValue !== '-') {
+        cardHTML += `
+            <div class="card-section">
+                <div class="card-content">
+                    <span class="card-label">판매자:</span>
+                    <span class="card-value seller">${formatCellValue(sellerValue, sellerField)}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    const deliveryDateInfo = getDeliveryDateInfo(columns, firstRecord);
+    if (deliveryDateInfo) {
+        cardHTML += `
+            <div class="card-section">
+                <div class="card-content">
+                    <span class="card-label">배송일:</span>
+                    <span class="card-value">${deliveryDateInfo}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    records.forEach((record) => {
+        const row = record.row;
+        
+        const productInfo = formatProductInfo(columns, row);
+        if (productInfo) {
+            cardHTML += `
+                <div class="card-section">
+                    <div class="card-content">
+                        <span class="card-label">상품:</span>
+                        <span class="card-value product">${productInfo}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        const purposeField = columns.find(col => col.includes('용도') || col.includes('목적'));
+        if (purposeField) {
+            const purposeValue = row[columns.indexOf(purposeField)];
+            if (purposeValue && purposeValue !== '-') {
+                cardHTML += `
+                    <div class="card-section">
+                        <div class="card-content">
+                            <span class="card-label">구매용도:</span>
+                            <span class="card-value">${formatCellValue(purposeValue, purposeField)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        const discountPriceField = columns.find(col => col.includes('할인가') || col.includes('할인금액'));
+        const priceField = columns.find(col => (col.includes('출고가') || col.includes('금액') || col.includes('가격')) && !col.includes('할인'));
+        const finalPriceField = discountPriceField || priceField;
+        
+        if (finalPriceField) {
+            const priceValue = row[columns.indexOf(finalPriceField)];
+            if (priceValue) {
+                let priceText = formatCellValue(priceValue, finalPriceField) + '원';
+                
+                if (discountPriceField) {
+                    priceText += ' <span class="card-value discount">(할인가)</span>';
+                } else {
+                    const discountRateField = columns.find(col => col.includes('할인율') || col.includes('할인') || col.includes('D.C'));
+                    if (discountRateField) {
+                        const discountValue = row[columns.indexOf(discountRateField)];
+                        if (discountValue && discountValue !== '-' && discountValue !== '0' && parseFloat(discountValue) !== 0) {
+                            priceText += ' <span class="card-value discount">(할인가)</span>';
+                        }
+                    }
+                }
+                
+                cardHTML += `
+                    <div class="card-section">
+                        <div class="card-content">
+                            <span class="card-label">금액:</span>
+                            <span class="card-value money">${priceText}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        const allowedPaymentFields = columns.filter(col => {
+            const colName = col;
+            if (colName.includes('현금증빙') || colName.includes('현금영수증') || colName.includes('세금계산서') ||
+                colName.includes('카드수수료') || colName.includes('수수료') ||
+                colName.includes('카드사') || colName.includes('할부')) {
+                return false;
+            }
+            return (colName.includes('카드') && !colName.includes('형상품권') && !colName.includes('카드형') ||
+                    colName.includes('현금') && !colName.includes('증빙') && !colName.includes('영수증') ||
+                    colName.includes('QR결제') || colName.includes('QR') && colName.includes('결제') ||
+                    colName.includes('지역상품권') ||
+                    colName.includes('카드형상품권'));
+        });
+        
+        if (allowedPaymentFields.length > 0) {
+            let paymentText = [];
+            allowedPaymentFields.forEach(field => {
+                const value = row[columns.indexOf(field)];
+                if (value && value !== '-' && value !== '0' && parseFloat(value) !== 0) {
+                    const formatted = formatCellValue(value, field);
+                    let fieldName = field.replace('결제', '').trim();
+                    paymentText.push(`${fieldName} ${formatted}원`);
+                }
+            });
+            
+            if (paymentText.length > 0) {
+                cardHTML += `
+                    <div class="card-section">
+                        <div class="card-content">
+                            <span class="card-label">결제:</span>
+                            <span class="card-value">${paymentText.join(' + ')}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        const discountRateField = columns.find(col => col.includes('할인율') || col.includes('D.C') || col.includes('율'));
+        if (discountRateField) {
+            const discountRateValue = row[columns.indexOf(discountRateField)];
+            if (discountRateValue && discountRateValue !== '-' && discountRateValue !== '0') {
+                const discountRate = formatCellValue(discountRateValue, discountRateField);
+                cardHTML += `
+                    <div class="card-section">
+                        <div class="card-content">
+                            <span class="card-label">할인율:</span>
+                            <span class="card-value discount-rate">${discountRate}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        const giftInfo = formatGiftInfo(columns, row);
+        if (giftInfo) {
+            cardHTML += `
+                <div class="card-section">
+                    <div class="card-content">
+                        <span class="card-label">사은품:</span>
+                        <span class="card-value gift">${giftInfo}</span>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    cardHTML += `
+            </div>
+        </div>
+    `;
+    
+    return cardHTML;
+}
+
+// 단일 카드 생성
+function createSingleDataCard(columns, row, index) {
+    const dateField = columns.find(col => col.includes('날짜') || col.includes('일'));
+    const dateValue = dateField ? row[columns.indexOf(dateField)] : null;
+    
+    let cardHTML = `
+        <div class="data-card">
+            <div class="card-header">
+                <div class="card-number">#${index}</div>
+            </div>
+            <div class="card-body">
+    `;
+    
+    if (dateValue) {
+        cardHTML += `
+            <div class="card-section">
+                <div class="card-content">
+                    <span class="card-label">날짜:</span>
+                    <span class="card-value">${formatDateForCard(dateValue, dateField)}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    columns.forEach((col, colIndex) => {
+        const value = row[colIndex];
+        const formattedValue = formatCellValue(value, col);
+        
+        if (formattedValue && formattedValue !== '-' && col !== dateField) {
+            const isMoneyField = col.includes('금액') || col.includes('가격') || col.includes('출고가');
+            cardHTML += `
+                <div class="card-section">
+                    <div class="card-content">
+                        <span class="card-label">${col}:</span>
+                        <span class="card-value ${isMoneyField ? 'money' : ''}">${formattedValue}</span>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    cardHTML += `
+            </div>
+        </div>
+    `;
+    
+    return cardHTML;
+}
+
+// 유틸리티 함수들
+function extractLocationInfo(columns, row) {
+    const addressPatterns = [/주소|address|addr/i, /지역|region|area/i, /동|읍|면|리|dong|myeon|ri/i, /시|군|구|si|gun|gu/i, /도|do|province/i];
+    let province = '';
+    let city = '';
+    let dong = '';
+    
+    const addressColumns = columns.filter(col => addressPatterns.some(pattern => pattern.test(col)));
+    
+    addressColumns.forEach(col => {
+        const value = row[columns.indexOf(col)];
+        if (value && value !== '-' && String(value).trim() !== '') {
+            const addressText = String(value).trim();
+            
+            if (!province) {
+                const provinceMatch = addressText.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(특별시|광역시|도)?/);
+                if (provinceMatch) {
+                    province = provinceMatch[1];
+                }
+            }
+            
+            if (!city) {
+                const cityMatch = addressText.match(/([가-힣]+(시|군|구))(?!.*(시|군|구))/);
+                if (cityMatch) {
+                    city = cityMatch[1];
+                }
+            }
+            
+            if (!dong) {
+                const dongMatch = addressText.match(/([가-힣]+(동|읍|면|리))(?!.*(동|읍|면|리))/);
+                if (dongMatch) {
+                    dong = dongMatch[1];
+                }
+            }
+        }
+    });
+    
+    const locationParts = [];
+    if (province) locationParts.push(province);
+    if (city) locationParts.push(city);
+    if (dong) locationParts.push(dong);
+    
+    return locationParts.length > 0 ? locationParts.join(' ') : null;
+}
+
+function getDeliveryDateInfo(columns, row) {
+    const deliveryField = columns.find(col => col.includes('배송일') || col.includes('출고일') || col.includes('납품일'));
+    if (deliveryField) {
+        const deliveryValue = row[columns.indexOf(deliveryField)];
+        if (deliveryValue && deliveryValue !== '-') {
+            return formatDateForCard(deliveryValue, deliveryField);
+        }
+    }
+    return null;
+}
+
+function formatProductInfo(columns, row) {
+    const productNameField = columns.find(col => col.includes('상품') || col.includes('제품') || col.includes('품명'));
+    const specField = columns.find(col => col.includes('규격') || col.includes('사이즈') || col.includes('size'));
+    const gradeField = columns.find(col => col.includes('등급') || col.includes('품질') || col.includes('grade'));
+    const materialField = columns.find(col => col.includes('소재') || col.includes('재질') || col.includes('material'));
+    const colorField = columns.find(col => col.includes('색상') || col.includes('컬러') || col.includes('color'));
+    const quantityField = columns.find(col => col.includes('수량') || col.includes('개수') || col.includes('quantity'));
+    
+    const productParts = [];
+    
+    if (productNameField) {
+        const productName = row[columns.indexOf(productNameField)];
+        if (productName && productName !== '-') {
+            productParts.push(formatCellValue(productName, productNameField));
+        }
+    }
+    
+    if (specField) {
+        const spec = row[columns.indexOf(specField)];
+        if (spec && spec !== '-') {
+            productParts.push(formatCellValue(spec, specField));
+        }
+    }
+    
+    if (gradeField) {
+        const grade = row[columns.indexOf(gradeField)];
+        if (grade && grade !== '-') {
+            productParts.push(formatCellValue(grade, gradeField));
+        }
+    }
+    
+    if (materialField) {
+        const material = row[columns.indexOf(materialField)];
+        if (material && material !== '-') {
+            productParts.push(formatCellValue(material, materialField));
+        }
+    }
+    
+    if (colorField) {
+        const color = row[columns.indexOf(colorField)];
+        if (color && color !== '-') {
+            productParts.push(formatCellValue(color, colorField));
+        }
+    }
+    
+    if (quantityField) {
+        const quantity = row[columns.indexOf(quantityField)];
+        if (quantity && quantity !== '-' && quantity !== '0') {
+            const quantityValue = parseFloat(quantity);
+            if (!isNaN(quantityValue)) {
+                productParts.push(Math.round(quantityValue).toString() + '개');
+            } else {
+                productParts.push(formatCellValue(quantity, quantityField));
+            }
+        }
+    }
+    
+    return productParts.length > 0 ? productParts.join(' / ') : null;
+}
+
+function formatGiftInfo(columns, row) {
+    const giftFields = columns.filter(col => 
+        (col.includes('사은품') || col.includes('증정') || col.includes('선물') || col.includes('프로모션') || 
+         col.includes('이벤트') || col.toLowerCase().includes('gift') || col.toLowerCase().includes('promotion') ||
+         col.toLowerCase().includes('free') || col.includes('무료')) &&
+        !col.includes('금액') && !col.includes('가격') && !col.includes('비용') && !col.includes('원') && 
+        !col.includes('비용') && !col.includes('M/G')
+    );
+    
+    const giftParts = [];
+    giftFields.forEach(field => {
+        const value = row[columns.indexOf(field)];
+        if (value && value !== '-' && value !== '0' && String(value).trim() !== '') {
+            const formattedValue = formatCellValue(value, field);
+            if (!/^[\d,.\s]+원?$/.test(formattedValue) && !/^\d+$/.test(formattedValue)) {
+                giftParts.push(formattedValue);
+            }
+        }
+    });
+    
+    return giftParts.length > 0 ? giftParts.join(' / ') : null;
+}
+
+function formatDateForCard(value, columnName) {
+    if (!value) return '';
+    
+    const stringValue = String(value).trim();
+    
+    const dateMatch = stringValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+        const year = dateMatch[1];
+        const month = parseInt(dateMatch[2]);
+        const day = parseInt(dateMatch[3]);
+        const date = new Date(year, month - 1, day);
+        const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+        const weekday = weekdays[date.getDay()];
+        return `${year}년 ${month}월 ${day}일(${weekday})`;
+    }
+    
+    if (stringValue.match(/^\d{8}$/)) {
+        const year = stringValue.substring(0, 4);
+        const month = parseInt(stringValue.substring(4, 6));
+        const day = parseInt(stringValue.substring(6, 8));
+        const date = new Date(year, month - 1, day);
+        const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+        const weekday = weekdays[date.getDay()];
+        return `${year}년 ${month}월 ${day}일(${weekday})`;
+    }
+    
+    if (stringValue.match(/^\d{4}-\d{2}$/)) {
+        const year = stringValue.substring(0, 4);
+        const month = parseInt(stringValue.substring(5, 7));
+        return `${year}년 ${month}월`;
+    }
+    
+    if (stringValue.match(/^\d{6}$/)) {
+        const year = stringValue.substring(0, 4);
+        const month = parseInt(stringValue.substring(4, 6));
+        return `${year}년 ${month}월`;
+    }
+    
+    return formatCellValue(value, columnName);
+}
+
+function formatCellValue(value, columnName) {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+    
+    const stringValue = String(value).trim();
+    
+    const dateColumns = ['판매일', '배송일', '날짜', 'date', '출고예정일', '배송예정일'];
+    const isDateColumn = dateColumns.some(dateCol => columnName.includes(dateCol));
+    
+    if (isDateColumn) {
+        if (stringValue.match(/^\d{4}-\d{2}-\d{2}/)) {
+            return stringValue.split(' ')[0];
+        }
+        if (stringValue.match(/^\d{8}$/)) {
+            return stringValue.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+        }
+        if (stringValue.match(/^\d{6}$/)) {
+            return stringValue.replace(/(\d{4})(\d{2})/, '$1-$2');
+        }
+    }
+    
+    if (columnName.includes('YEAR') || columnName === 'YEAR') {
+        return stringValue;
+    }
+    
+    if (columnName.includes('수량') || columnName.includes('개수') || columnName.includes('quantity') || columnName.includes('qty')) {
+        if (!isNaN(stringValue) && stringValue !== '') {
+            const numValue = parseFloat(stringValue);
+            return Math.round(numValue).toString();
+        }
+    }
+    
+    if (columnName.includes('건수') || columnName.includes('COUNT')) {
+        if (!isNaN(stringValue) && stringValue !== '') {
+            const numValue = parseFloat(stringValue);
+            return numValue.toFixed(2);
+        }
+    }
+    
+    if (columnName.includes('D.C%') || columnName.includes('할인율') || columnName.includes('율')) {
+        if (!isNaN(stringValue) && stringValue !== '') {
+            const numValue = parseFloat(stringValue);
+            if (!stringValue.includes('%')) {
+                return (numValue * 100).toFixed(1) + '%';
+            }
+        }
+        return stringValue;
+    }
+    
+    const moneyColumns = ['출고가', '공급가', '배송비', '사은품비', 'M/G', '가격', '금액', '비용'];
+    const isMoneyColumn = moneyColumns.some(moneyCol => columnName.includes(moneyCol));
+    
+    if (isMoneyColumn && !isNaN(stringValue) && stringValue !== '') {
+        const numValue = parseFloat(stringValue);
+        if (Number.isInteger(numValue)) {
+            return numValue.toLocaleString();
+        } else {
+            return numValue.toLocaleString(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        }
+    }
+    
+    if (!isNaN(stringValue) && stringValue !== '') {
+        const numValue = parseFloat(stringValue);
+        if (numValue >= 0 && numValue <= 1 && stringValue.includes('.')) {
+            const decimalPlaces = stringValue.split('.')[1].length;
+            if (decimalPlaces >= 2) {
+                return (numValue * 100).toFixed(1) + '%';
+            }
+        }
+        if (Number.isInteger(numValue)) {
+            return numValue.toLocaleString();
+        } else {
+            return numValue.toFixed(Math.min(2, stringValue.split('.')[1].length));
+        }
+    }
+    
+    return stringValue;
+}
+
+// 페이지네이션
+function updatePagination(tabName) {
+    const results = tabName === 'ACE' ? aceResults : essaResults;
+    const totalPages = Math.ceil(results.rows.length / results.pageSize);
+    const prefix = tabName.toLowerCase();
+    
+    document.getElementById(`${prefix}-page-info`).textContent = `${results.currentPage} / ${totalPages} 페이지`;
+    document.getElementById(`${prefix}-prev-btn`).disabled = results.currentPage === 1;
+    document.getElementById(`${prefix}-next-btn`).disabled = results.currentPage === totalPages || totalPages === 0;
+}
+
+function previousPage(tabName) {
+    const results = tabName === 'ACE' ? aceResults : essaResults;
+    
+    if (results.currentPage > 1) {
+        results.currentPage--;
+        displayResults(tabName);
+        updatePagination(tabName);
+    }
+}
+
+function nextPage(tabName) {
+    const results = tabName === 'ACE' ? aceResults : essaResults;
+    const totalPages = Math.ceil(results.rows.length / results.pageSize);
+    
+    if (results.currentPage < totalPages) {
+        results.currentPage++;
+        displayResults(tabName);
+        updatePagination(tabName);
+    }
+}
+
+// 결과 카운트 업데이트
+function updateResultCount(tabName) {
+    const results = tabName === 'ACE' ? aceResults : essaResults;
+    const resultCountElement = document.getElementById(`${tabName.toLowerCase()}-result-count`);
+    
+    if (results.rows.length > 0) {
+        resultCountElement.textContent = `(${results.rows.length.toLocaleString()}개 행)`;
+    } else {
+        resultCountElement.textContent = '';
+    }
+}
+
+// 내보내기 정보 업데이트
+function updateExportInfo(tabName) {
+    const results = tabName === 'ACE' ? aceResults : essaResults;
+    const exportInfo = document.getElementById(`${tabName.toLowerCase()}-export-info`);
+    
+    if (results.rows.length > 0) {
+        exportInfo.textContent = `현재 ${results.rows.length.toLocaleString()}개 행의 검색 결과를 내보냅니다`;
+    } else {
+        exportInfo.textContent = '현재 검색 결과를 내보냅니다';
+    }
+}
+
+// Excel 내보내기
+function exportToExcel(tabName) {
+    const results = tabName === 'ACE' ? aceResults : essaResults;
+    
+    if (results.rows.length === 0) {
+        showStatus('⚠️ 내보낼 데이터가 없습니다', 'error');
+        return;
+    }
+    
+    try {
+        const columns = results.columns;
+        const rows = results.rows;
+        
+        const wsData = [columns];
+        rows.forEach(row => {
+            const rowData = columns.map((col, index) => {
+                const cell = row[index];
+                return formatCellValue(cell, col);
+            });
+            wsData.push(rowData);
+        });
+        
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        
+        const colWidths = columns.map((col, index) => {
+            const maxLength = Math.max(
+                col.length,
+                ...rows.map(row => {
+                    const cell = row[index];
+                    return String(formatCellValue(cell, col)).length;
+                })
+            );
+            return { width: Math.min(Math.max(maxLength, 8), 50) };
+        });
+        
+        ws['!cols'] = colWidths;
+        
+        XLSX.utils.book_append_sheet(wb, ws, tabName);
+        
+        const fileName = `${tabName}_검색결과_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        
+        showStatus(`✅ 검색 결과 ${rows.length.toLocaleString()}개 행을 Excel로 내보냈습니다`, 'success');
+    } catch (error) {
+        showStatus('❌ Excel 내보내기 실패: ' + error.message, 'error');
+    }
+}
+
+// 상태 메시지 표시
+function showStatus(message, type) {
+    const statusArea = document.getElementById('status-area');
+    statusArea.innerHTML = `<div class="status ${type}">${message}</div>`;
+    
+    if (type !== 'error' && type !== 'loading') {
+        setTimeout(() => {
+            statusArea.innerHTML = '';
+        }, 3000);
+    }
+}
+</script>
+</body>
+</html>
